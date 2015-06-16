@@ -38,273 +38,274 @@ public class MuleRest {
     private String password;
 
     public MuleRest(URL mmcUrl, String username, String password) {
-	this.mmcUrl = mmcUrl;
-	this.username = username;
-	this.password = password;
-	logger.debug("MMC URL: {}, Username: {}", mmcUrl, username);
+        this.mmcUrl = mmcUrl;
+        this.username = username;
+        this.password = password;
+        logger.debug("MMC URL: {}, Username: {}", mmcUrl, username);
     }
 
     private WebClient getWebClient(String... paths) {
-	WebClient webClient = WebClient.create(mmcUrl.toString(), username, password, null);
-	for (String path : paths) {
-	    webClient.path(path);
-	}
-	return webClient;
+        WebClient webClient = WebClient.create(mmcUrl.toString(), username, password, null);
+        for (String path : paths) {
+            webClient.path(path);
+        }
+        return webClient;
     }
 
     private String processResponse(Response response) throws IOException {
-	int statusCode = response.getStatus();
-	String responseObject = IOUtils.toString((InputStream) response.getEntity());
+        int statusCode = response.getStatus();
+        String responseObject = IOUtils.toString((InputStream) response.getEntity());
 
-	if (statusCode == Status.OK.getStatusCode() || statusCode == Status.CREATED.getStatusCode()) {
-	    return responseObject;
-	} else if (statusCode == Status.NOT_FOUND.getStatusCode()) {
-	    HTTPException he = new HTTPException(statusCode, "The resource was not found.", mmcUrl);
-	    throw he;
-	} else if (statusCode == Status.CONFLICT.getStatusCode()) {
-	    HTTPException he = new HTTPException(statusCode, "The operation was unsuccessful because a resource with that name already exists.", mmcUrl);
-	    throw he;
-	} else if (statusCode == Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
-	    HTTPException he = new HTTPException(statusCode, "The operation was unsuccessful.", mmcUrl);
-	    throw he;
-	} else {
-	    HTTPException he = new HTTPException(statusCode, "Unexpected Status Code Return, Status Line: " + statusCode, mmcUrl);
-	    throw he;
-	}
+        if (statusCode == Status.OK.getStatusCode() || statusCode == Status.CREATED.getStatusCode()) {
+            return responseObject;
+        } else if (statusCode == Status.NOT_FOUND.getStatusCode()) {
+            HTTPException he = new HTTPException(statusCode, "The resource was not found.", mmcUrl);
+            throw he;
+        } else if (statusCode == Status.CONFLICT.getStatusCode()) {
+            HTTPException he = new HTTPException(statusCode, "The operation was unsuccessful because a resource with that name already exists.", mmcUrl);
+            throw he;
+        } else if (statusCode == Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
+            HTTPException he = new HTTPException(statusCode, "The operation was unsuccessful.", mmcUrl);
+            throw he;
+        } else {
+            HTTPException he = new HTTPException(statusCode, "Unexpected Status Code Return, Status Line: " + statusCode, mmcUrl);
+            throw he;
+        }
     }
 
     public String restfullyCreateDeployment(String serverGroup, String name, String versionId) throws IOException {
-	Set<String> serversIds = restfullyGetServers(serverGroup);
-	if (serversIds.isEmpty()) {
-	    throw new IllegalArgumentException("No server found into group : " + serverGroup);
-	}
+        Set<String> serversIds = restfullyGetServers(serverGroup);
+        if (serversIds.isEmpty()) {
+            throw new IllegalArgumentException("No server found into group : " + serverGroup);
+        }
 
-	// delete existing deployment before creating new one
-	restfullyDeleteDeployment(name);
+        // delete existing deployment before creating new one
+        restfullyDeleteDeployment(name);
 
-	WebClient webClient = getWebClient("deployments");
-    webClient.type(MediaType.APPLICATION_JSON_TYPE);
+        WebClient webClient = getWebClient("deployments");
+        webClient.type(MediaType.APPLICATION_JSON_TYPE);
 
 
-	try {
-	    StringWriter stringWriter = new StringWriter();
-	    JsonFactory jfactory = new JsonFactory();
-	    JsonGenerator jGenerator = jfactory.createJsonGenerator(stringWriter);
-	    jGenerator.writeStartObject(); // {
-	    jGenerator.writeStringField("name", name); // "name" : name
-	    jGenerator.writeFieldName("servers"); // "servers" :
-	    jGenerator.writeStartArray(); // [
-	    for (String serverId : serversIds) {
-		jGenerator.writeString(serverId); // "serverId"
-	    }
-	    jGenerator.writeEndArray(); // ]
-	    jGenerator.writeFieldName("applications"); // "applications" :
-	    jGenerator.writeStartArray(); // [
-	    jGenerator.writeString(versionId); // "applicationId"
-	    jGenerator.writeEndArray(); // ]
-	    jGenerator.writeEndObject(); // }
-	    jGenerator.close();
+        try {
+            StringWriter stringWriter = new StringWriter();
+            JsonFactory jfactory = new JsonFactory();
+            JsonGenerator jGenerator = jfactory.createJsonGenerator(stringWriter);
+            jGenerator.writeStartObject(); // {
+            jGenerator.writeStringField("name", name); // "name" : name
+            jGenerator.writeFieldName("servers"); // "servers" :
+            jGenerator.writeStartArray(); // [
+            for (String serverId : serversIds) {
+                jGenerator.writeString(serverId); // "serverId"
+            }
+            jGenerator.writeEndArray(); // ]
+            jGenerator.writeFieldName("applications"); // "applications" :
+            jGenerator.writeStartArray(); // [
+            jGenerator.writeString(versionId); // "applicationId"
+            jGenerator.writeEndArray(); // ]
+            jGenerator.writeEndObject(); // }
+            jGenerator.close();
 
-	    Response response = webClient.post(stringWriter.toString());
-	    InputStream responseStream = (InputStream) response.getEntity();
-	    JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
+            Response response = webClient.post(stringWriter.toString());
+            InputStream responseStream = (InputStream) response.getEntity();
+            JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
 
-	    return jsonNode.path("id")
-		    .asText();
-	} finally {
-	    webClient.close();
-	}
+            return jsonNode.path("id")
+                    .asText();
+        } finally {
+            webClient.close();
+        }
     }
 
     public void restfullyDeleteDeployment(String name) throws IOException {
-	String deploymentId = restfullyGetDeploymentIdByName(name);
-	if (deploymentId != null) {
-	    restfullyDeleteDeploymentById(deploymentId);
-	}
+        String deploymentId = restfullyGetDeploymentIdByName(name);
+        if (deploymentId != null) {
+            restfullyDeleteDeploymentById(deploymentId);
+        }
     }
 
     public void restfullyDeleteDeploymentById(String deploymentId) throws IOException {
-	WebClient webClient = getWebClient("deployments", deploymentId);
+        WebClient webClient = getWebClient("deployments", deploymentId);
 
-	try {
-	    Response response = webClient.delete();
-	    processResponse(response);
-	} finally {
-	    webClient.close();
-	}
+        try {
+            Response response = webClient.delete();
+            processResponse(response);
+        } finally {
+            webClient.close();
+        }
     }
 
     public void restfullyDeployDeploymentById(String deploymentId) throws IOException {
-	WebClient webClient = getWebClient("deployments", deploymentId, "deploy");
+        WebClient webClient = getWebClient("deployments", deploymentId, "deploy");
 
-	try {
-	    Response response = webClient.post(null);
-	    processResponse(response);
-	} finally {
-	    webClient.close();
-	}
+        try {
+            Response response = webClient.post(null);
+            processResponse(response);
+        } finally {
+            webClient.close();
+        }
     }
 
     public String restfullyGetDeploymentIdByName(String name) throws IOException {
-	WebClient webClient = getWebClient("deployments");
+        WebClient webClient = getWebClient("deployments");
 
-	String deploymentId = null;
-	try {
-	    Response response = webClient.get();
+        String deploymentId = null;
+        try {
+            Response response = webClient.get();
 
-	    InputStream responseStream = (InputStream) response.getEntity();
-	    JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
-	    JsonNode deploymentsNode = jsonNode.path("data");
-	    for (JsonNode deploymentNode : deploymentsNode) {
-		if (name.equals(deploymentNode.path("name")
-			.asText())) {
-		    deploymentId = deploymentNode.path("id")
-			    .asText();
-		    break;
-		}
-	    }
-	} finally {
-	    webClient.close();
-	}
-	return deploymentId;
+            InputStream responseStream = (InputStream) response.getEntity();
+            JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
+            JsonNode deploymentsNode = jsonNode.path("data");
+            for (JsonNode deploymentNode : deploymentsNode) {
+                if (name.equals(deploymentNode.path("name")
+                        .asText())) {
+                    deploymentId = deploymentNode.path("id")
+                            .asText();
+                    break;
+                }
+            }
+        } finally {
+            webClient.close();
+        }
+        return deploymentId;
     }
-    
-    public String restfullyGetApplicationId(String name, String version) throws IOException{
-    	WebClient webClient = getWebClient("repository");
-    	
-    	String applicationId = null;
-    	try{
-    		Response response = webClient.get();
-    		
-    		InputStream responseStream = (InputStream) response.getEntity();
-    		JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
-    		JsonNode applicationsNode = jsonNode.path("data");
-    		for(JsonNode applicationNode : applicationsNode){
-    			if(name.equals(applicationNode.path("name").asText())){
-    				JsonNode versionsNode = applicationNode.path("versions");
-    				for(JsonNode versionNode : versionsNode){
-    					if(version.equals(versionNode.path("name").asText())){
-    						applicationId = versionNode.get("id").asText();
-    						break;
-    					}
-    				}
-    			}
-    		}
-    	}finally{
-    		webClient.close();
-    	}
-    	return applicationId;
+
+    public String restfullyGetApplicationId(String name, String version) throws IOException {
+        WebClient webClient = getWebClient("repository");
+
+        String applicationId = null;
+        try {
+            Response response = webClient.get();
+
+            InputStream responseStream = (InputStream) response.getEntity();
+
+            JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
+            JsonNode applicationsNode = jsonNode.path("data");
+            for (JsonNode applicationNode : applicationsNode) {
+                if (name.equals(applicationNode.path("name").asText())) {
+                    JsonNode versionsNode = applicationNode.path("versions");
+                    for (JsonNode versionNode : versionsNode) {
+                        if (version.equals(versionNode.path("name").asText())) {
+                            applicationId = versionNode.get("id").asText();
+                            break;
+                        }
+                    }
+                }
+            }
+        } finally {
+            webClient.close();
+        }
+        return applicationId;
     }
 
     public final String restfullyGetServerGroupId(String serverGroup) throws IOException {
-	String serverGroupId = null;
+        String serverGroupId = null;
 
-	WebClient webClient = getWebClient("serverGroups");
-	try {
-	    Response response = webClient.get();
+        WebClient webClient = getWebClient("serverGroups");
+        try {
+            Response response = webClient.get();
 
-	    InputStream responseStream = (InputStream) response.getEntity();
-	    JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
-	    JsonNode groupsNode = jsonNode.path("data");
-	    for (JsonNode groupNode : groupsNode) {
-		if (serverGroup.equals(groupNode.path("name")
-			.asText())) {
-		    serverGroupId = groupNode.path("id")
-			    .asText();
-		    break;
-		}
-	    }
-	    if (serverGroupId == null) {
-		throw new IllegalArgumentException("no server group found having the name " + serverGroup);
-	    }
-	} finally {
-	    webClient.close();
-	}
-	return serverGroupId;
+            InputStream responseStream = (InputStream) response.getEntity();
+            JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
+            JsonNode groupsNode = jsonNode.path("data");
+            for (JsonNode groupNode : groupsNode) {
+                if (serverGroup.equals(groupNode.path("name")
+                        .asText())) {
+                    serverGroupId = groupNode.path("id")
+                            .asText();
+                    break;
+                }
+            }
+            if (serverGroupId == null) {
+                throw new IllegalArgumentException("no server group found having the name " + serverGroup);
+            }
+        } finally {
+            webClient.close();
+        }
+        return serverGroupId;
     }
 
     public Set<String> restfullyGetServers(String serverGroup) throws IOException {
-	Set<String> serversId = new TreeSet<String>();
-	WebClient webClient = getWebClient("servers");
+        Set<String> serversId = new TreeSet<String>();
+        WebClient webClient = getWebClient("servers");
 
-	try {
-	    Response response = webClient.get();
+        try {
+            Response response = webClient.get();
 
-	    InputStream responseStream = (InputStream) response.getEntity();
-	    JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
-	    JsonNode serversNode = jsonNode.path("data");
-	    for (JsonNode serverNode : serversNode) {
-		String serverId = serverNode.path("id")
-			.asText();
+            InputStream responseStream = (InputStream) response.getEntity();
+            JsonNode jsonNode = OBJECT_MAPPER.readTree(responseStream);
+            JsonNode serversNode = jsonNode.path("data");
+            for (JsonNode serverNode : serversNode) {
+                String serverId = serverNode.path("id")
+                        .asText();
 
-		JsonNode groupsNode = serverNode.path("groups");
-		for (JsonNode groupNode : groupsNode) {
-		    if (serverGroup.equals(groupNode.path("name")
-			    .asText())) {
-			serversId.add(serverId);
-		    }
-		}
-	    }
-	} finally {
-	    webClient.close();
-	}
-	return serversId;
+                JsonNode groupsNode = serverNode.path("groups");
+                for (JsonNode groupNode : groupsNode) {
+                    if (serverGroup.equals(groupNode.path("name")
+                            .asText())) {
+                        serversId.add(serverId);
+                    }
+                }
+            }
+        } finally {
+            webClient.close();
+        }
+        return serversId;
     }
 
     public String restfullyUploadRepository(String name, String version, File packageFile) throws IOException {
-	WebClient webClient = getWebClient("repository");
-	webClient.type("multipart/form-data");
+        WebClient webClient = getWebClient("repository");
+        webClient.type("multipart/form-data");
 
-	try {
-		//delete application first
-		if(isSnapshotVersion(version)){
-			restfullyDeleteApplication(name, version);
-		}
-	    Attachment nameAttachment = new AttachmentBuilder().id("name")
-		    .object(name)
-		    .contentDisposition(new ContentDisposition("form-data; name=\"name\""))
-		    .build();
-	    Attachment versionAttachment = new AttachmentBuilder().id("version")
-		    .object(version)
-		    .contentDisposition(new ContentDisposition("form-data; name=\"version\""))
-		    .build();
-	    Attachment fileAttachment = new Attachment("file", new FileInputStream(packageFile), new ContentDisposition("form-data; name=\"file\"; filename=\"" + packageFile.getName() + "\""));
+        try {
+            //delete application first
+            if (isSnapshotVersion(version)) {
+                restfullyDeleteApplication(name, version);
+            }
+            Attachment nameAttachment = new AttachmentBuilder().id("name")
+                    .object(name)
+                    .contentDisposition(new ContentDisposition("form-data; name=\"name\""))
+                    .build();
+            Attachment versionAttachment = new AttachmentBuilder().id("version")
+                    .object(version)
+                    .contentDisposition(new ContentDisposition("form-data; name=\"version\""))
+                    .build();
+            Attachment fileAttachment = new Attachment("file", new FileInputStream(packageFile), new ContentDisposition("form-data; name=\"file\"; filename=\"" + packageFile.getName() + "\""));
 
-	    MultipartBody multipartBody = new MultipartBody(Arrays.asList(fileAttachment, nameAttachment, versionAttachment), MediaType.MULTIPART_FORM_DATA_TYPE, true);
+            MultipartBody multipartBody = new MultipartBody(Arrays.asList(fileAttachment, nameAttachment, versionAttachment), MediaType.MULTIPART_FORM_DATA_TYPE, true);
 
-	    Response response = webClient.post(multipartBody);
+            Response response = webClient.post(multipartBody);
 
-	    String responseObject = processResponse(response);
+            String responseObject = processResponse(response);
 
-	    ObjectMapper mapper = new ObjectMapper();
-	    JsonNode result = mapper.readTree(responseObject);
-	    return result.path("versionId")
-		    .asText();
-	} finally {
-	    webClient.close();
-	}
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode result = mapper.readTree(responseObject);
+            return result.path("versionId")
+                    .asText();
+        } finally {
+            webClient.close();
+        }
     }
 
-	public void restfullyDeleteApplicationById(String applicationVersionId) throws IOException {
-	WebClient webClient = getWebClient("repository", applicationVersionId);
+    public void restfullyDeleteApplicationById(String applicationVersionId) throws IOException {
+        WebClient webClient = getWebClient("repository", applicationVersionId);
 
-	try {
-	    Response response = webClient.delete();
-	    processResponse(response);
-	} finally {
-	    webClient.close();
-	}
-		
-	}
+        try {
+            Response response = webClient.delete();
+            processResponse(response);
+        } finally {
+            webClient.close();
+        }
 
-	public void restfullyDeleteApplication(String applicationName, String version) throws IOException {
-	String applicationVersionId = restfullyGetApplicationId(applicationName, version);
-	if(applicationVersionId != null){
-		restfullyDeleteApplicationById(applicationVersionId);
-	}
-	}
-	
-	protected boolean isSnapshotVersion(String version){
-		return version.contains(SNAPSHOT);
-	}
+    }
+
+    public void restfullyDeleteApplication(String applicationName, String version) throws IOException {
+        String applicationVersionId = restfullyGetApplicationId(applicationName, version);
+        if (applicationVersionId != null) {
+            restfullyDeleteApplicationById(applicationVersionId);
+        }
+    }
+
+    protected boolean isSnapshotVersion(String version) {
+        return version.contains(SNAPSHOT);
+    }
 }

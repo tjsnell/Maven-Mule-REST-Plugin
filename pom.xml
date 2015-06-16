@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.github.nicholasastuart</groupId>
+	<groupId>org.mule.tools</groupId>
 	<artifactId>mule-mmc-rest-plugin</artifactId>
 	<version>1.2.2-SNAPSHOT</version>
 	<packaging>maven-plugin</packaging>
@@ -16,6 +16,24 @@
         <artifactId>oss-parent</artifactId>
         <version>9</version>
     </parent>
+
+	<distributionManagement>
+		<repository>
+			<id>nexus</id>
+			<name>Nexus Releases</name>
+			<url>http://devapi.magnt.magmutual.com:8070/nexus/content/repositories/releases/</url>
+		</repository>
+		<snapshotRepository>
+			<id>nexus</id>
+			<name>Nexus Snapshot</name>
+			<url>http://devapi.magnt.magmutual.com:8070/nexus/content/repositories/snapshots/</url>
+		</snapshotRepository>
+		<site>
+			<id>nexus</id>
+			<name>Nexus Sites</name>
+			<url>dav:http://devapi.magnt.magmutual.com:8070/nexus/content/sites/site/</url>
+		</site>
+	</distributionManagement>
     
 	<scm>
 		<connection>scm:git:git@github.com:NicholasAStuart/Maven-Mule-REST-Plugin.git</connection>
